@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: chibiharu's Qiita [【AWS】CloudFormationでWebサーバを構築①（NW編）] - SecurityTemplate
+
+
+### Resources ###
+Resources:
+# ------------------------------------------------------------
+# SecurityGroup
+# ------------------------------------------------------------
+    chibiWebSG:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "http,https public"
+            GroupName: cfn-dev-web-sg
+            VpcId: !ImportValue "chibi-cfn-vpc"
+            SecurityGroupIngress:
+                IpProtocol: tcp
+                FromPort : 80
+                ToPort : 80
+                CidrIp: 0.0.0.0/0
+                IpProtocol: tcp
+                FromPort : 443
+                ToPort : 443
+                CidrIp: 0.0.0.0/0
+            SecurityGroupEgress:
+                IpProtocol: tcp
+                FromPort : 3306
+                ToPort : 3306
+                CidrIp: 0.0.0.0/0
+            
+    chibidbSG:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "db private"
+            GroupName: cfn-dev-db-sg
+            VpcId: !ImportValue "chibi-cfn-vpc"
+            SecurityGroupIngress:
+                IpProtocol: tcp
+                FromPort : 3306
+                ToPort : 3306
+                SourceSecurityGroupId: !Ref chibiWebSG
+        
+
+# ------------------------------------------------------------
+# Output Parameter
+# ------------------------------------------------------------
+Outputs:
+### SecurityGroup ###
+    chibiWebSG:
+        Value: !Ref chibiWebSG
+        Export:
+            Name: "chibi-cfn-web-sg"
+    chibidbSG:
+        Value: !Ref chibidbSG
+        Export:
+            Name: "chibi-cfn-db-sg"

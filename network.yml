@@ -1,0 +1,161 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: chibiharu's Qiita [【AWS】CloudFormationでWebサーバを構築①（NW編）] - NetworkTemplate
+    
+
+# ------------------------------------------------------------
+# Input Parameters
+# ------------------------------------------------------------
+Parameters:
+  VPCCIDR:
+    Type: String
+    Default: "192.168.0.0/20"
+  PublicSubnetCIDR:
+    Type: String
+    Default: "192.168.1.0/24"
+  PrivateSubnetCIDR:
+    Type: String
+    Default: "192.168.3.0/24"
+    
+
+### Resources ###
+Resources: 
+# ------------------------------------------------------------
+# VPC
+# ------------------------------------------------------------
+  chibiVPC: 
+    Type: "AWS::EC2::VPC"
+    Properties: 
+      CidrBlock: !Ref VPCCIDR
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      InstanceTenancy: default
+      Tags: 
+        - Key: Name
+          Value: "chibi-cfn-vpc"
+          
+          
+# ------------------------------------------------------------
+# InternetGateway:
+# ------------------------------------------------------------
+  chibiIGW: 
+    Type: "AWS::EC2::InternetGateway"
+    Properties: 
+      Tags: 
+        - Key: Name
+          Value: "chibi-cfn-igw"
+          
+  chibiIGWAttachment: 
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties: 
+      InternetGatewayId: !Ref chibiIGW
+      VpcId: !Ref chibiVPC
+
+      
+# ------------------------------------------------------------
+# Subnet
+# ------------------------------------------------------------
+  chibiPublicSubnetA: 
+    Type: "AWS::EC2::Subnet"
+    Properties: 
+      AvailabilityZone: "ap-northeast-1a"
+      CidrBlock: !Ref PublicSubnetCIDR
+      VpcId: !Ref chibiVPC 
+      Tags: 
+        - Key: Name
+          Value: "chibi-cfn-public-subnet-a"
+
+  chibiPrivateSubnetA: 
+    Type: "AWS::EC2::Subnet"
+    Properties: 
+      AvailabilityZone: "ap-northeast-1a"
+      CidrBlock: !Ref PrivateSubnetCIDR
+      VpcId: !Ref chibiVPC 
+      Tags: 
+        - Key: Name
+          Value: "chibi-cfn-private-subnet-a"
+
+
+# ------------------------------------------------------------
+# RouteTable
+# ------------------------------------------------------------
+  chibiPublicRTB: 
+    Type: "AWS::EC2::RouteTable"
+    Properties: 
+      VpcId: !Ref chibiVPC 
+      Tags: 
+        - Key: Name
+          Value: "chibi-cfn-public-route-a"
+
+  chibiPublicSubnetRTBAssociation: 
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties: 
+      SubnetId: !Ref chibiPublicSubnetA 
+      RouteTableId: !Ref chibiPublicRTB
+
+  chibiPublicRoute: 
+    Type: "AWS::EC2::Route"
+    Properties: 
+      RouteTableId: !Ref chibiPublicRTB
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref chibiIGW 
+
+  chibiPrivateRTB: 
+    Type: "AWS::EC2::RouteTable"
+    Properties: 
+      VpcId: !Ref chibiVPC 
+      Tags: 
+        - Key: Name
+          Value: "chibi-cfn-private-route-a"
+
+  chibiPrivateSubnetRTBAssociation: 
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties: 
+      SubnetId: !Ref chibiPrivateSubnetA
+      RouteTableId: !Ref chibiPrivateRTB
+
+# ------------------------------------------------------------
+# Output Parameter
+# ------------------------------------------------------------
+Outputs:
+### VPC ###
+  chibiVPC:
+    Value: !Ref chibiVPC
+    Export:
+      Name: "chibi-cfn-vpc"
+
+  VPCCIDR:
+    Value: !Ref VPCCIDR
+    Export:
+      Name: "chibi-cfn-vpc-cidr"
+      
+### Subnet ###
+  chibiPublicSubnetA:
+    Value: !Ref chibiPublicSubnetA
+    Export:
+      Name: "chibi-cfn-public-subnet-a"
+
+  PublicSubnetCIDR:
+    Value: !Ref PublicSubnetCIDR
+    Export:
+      Name: "chibi-cfn-public-subnet-a-cidr"
+
+  chibiPrivateSubnetA:
+    Value: !Ref chibiPrivateSubnetA
+    Export:
+      Name: "chibi-cfn-private-subnet-a"
+
+  PrivateSubnetCIDR:
+    Value: !Ref PrivateSubnetCIDR
+    Export:
+      Name: "chibi-cfn-private-subnet-a-cidr"
+      
+### RouteTable ###
+  chibiPublicRTB:
+    Value: !Ref chibiPublicRTB
+    Export:
+      Name: "chibi-cfn-public-route-a"
+
+  chibiPrivateRTB:
+    Value: !Ref chibiPrivateRTB
+    Export:
+      Name: "chibi-cfn-private-route-a"
