@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: chibiharu's Qiita [【AWS】CloudFormationでWebサーバを構築②（EC2編）] - ServerTemplate
+
+
+# ------------------------------------------------------------
+# Input Parameters
+# ------------------------------------------------------------
+Parameters:
+  ### Hosted Zone ###
+  HostedZoneName:
+    Type: String
+    Description: DNS Name to create
+    Default: chibiharujijimasa.work
+    AllowedPattern: (?!-)[a-zA-Z0-9-.]{1,63}(?<!-)
+    ConstraintDescription: must be a valid DNS zone name
+    
+
+### Resources ###
+Resources: 
+# ------------------------------------------------------------
+# EC2
+# ------------------------------------------------------------
+  chibiEC2: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: ami-032d6db78f84e8bf5
+      InstanceType: t2.micro
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          SubnetId: !ImportValue "chibi-cfn-public-subnet-a"
+          GroupSet:
+            - !ImportValue "chibi-cfn-web-sg"
+      UserData: !Base64 |-
+        #!/bin/bash
+        yum -y update
+        yum -y install httpd
+        systemctl start httpd
+        systemctl enable httpd
+        echo "chibiharu's Qiita Apache Test Page For Success" > /var/www/html/index.html
+      Tags:
+          - Key: Name
+            Value: "chibi-cfn-web-server-1a"
+
+
+# ------------------------------------------------------------
+# EIP
+# ------------------------------------------------------------           
+  chibiEIP:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: vpc
+
+  chibiEIPAssociate:
+    Type: AWS::EC2::EIPAssociation
+    Properties: 
+      InstanceId: !Ref chibiEC2
+      EIP: !Ref chibiEIP
+
+
+# ------------------------------------------------------------
+# Route53
+# ------------------------------------------------------------
+  HostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      Name: !Ref HostedZoneName
+      HostedZoneTags:
+      - Key: Name
+        Value: chibi-cfn-hostedzone
+
+  PrimaryDNSRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn: HostedZone
+    Properties:
+      HostedZoneId: !Ref HostedZone
+      Comment: DNS Name for Elastic IP Address
+      Name: !Join ["", [www, ".", !Ref HostedZoneName, "."] ]
+      Type: A
+      TTL: 60
+      ResourceRecords:
+      - !Ref chibiEIP
+        
+
+
