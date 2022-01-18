@@ -22,11 +22,6 @@ Resources:
                 FromPort : 443
                 ToPort : 443
                 CidrIp: 0.0.0.0/0
-            SecurityGroupEgress:
-                IpProtocol: tcp
-                FromPort : 3306
-                ToPort : 3306
-                CidrIp: 0.0.0.0/0
             
     chibidbSG:
         Type: "AWS::EC2::SecurityGroup"

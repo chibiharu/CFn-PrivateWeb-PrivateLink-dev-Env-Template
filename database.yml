@@ -1,0 +1,14 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: chibiharu's Qiita [【AWS】CloudFormationでWebサーバを構築②（EC2&RDS編）] - DatabaseTemplate
+
+
+# ------------------------------------------------------------
+# Input Parameters
+# ------------------------------------------------------------
+
+
+
+
+
+
+

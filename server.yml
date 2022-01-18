@@ -6,6 +6,9 @@ Description: chibiharu's Qiita [【AWS】CloudFormationでWebサーバを構築�
 # Input Parameters
 # ------------------------------------------------------------
 Parameters:
+  KeyName:
+    Description: input EC2 Keyname
+    Type: 'AWS::EC2::KeyPair::KeyName'
   ### Hosted Zone ###
   HostedZoneName:
     Type: String
@@ -25,19 +28,21 @@ Resources:
     Properties: 
       ImageId: ami-032d6db78f84e8bf5
       InstanceType: t2.micro
+      KeyName: !Ref KeyName
       NetworkInterfaces: 
         - AssociatePublicIpAddress: "true"
           DeviceIndex: "0"
           SubnetId: !ImportValue "chibi-cfn-public-subnet-a"
           GroupSet:
             - !ImportValue "chibi-cfn-web-sg"
-      UserData: !Base64 |-
-        #!/bin/bash
-        yum -y update
-        yum -y install httpd
-        systemctl start httpd
-        systemctl enable httpd
-        echo "chibiharu's Qiita Apache Test Page For Success" > /var/www/html/index.html
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          sudo yum -y update
+          sudo yum -y install httpd
+          sudo systemctl start httpd
+          sudo systemctl enable httpd
+          sudo echo "chibiharu's Qiita Apache Test Page For Success" > /var/www/html/index.html
       Tags:
           - Key: Name
             Value: "chibi-cfn-web-server-1a"
@@ -81,5 +86,17 @@ Resources:
       ResourceRecords:
       - !Ref chibiEIP
         
+
+# ------------------------------------------------------------
+# Output Parameter
+# ------------------------------------------------------------
+Outputs:
+### EC2 ###
+  chibiEC2:
+    Value: !Ref chibiEC2
+    Export:
+      Name: "chibi-cfn-web-server-1a"
+
+
 
 
