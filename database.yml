@@ -2,13 +2,132 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: chibiharu's Qiita [【AWS】CloudFormationでWebサーバを構築②（EC2&RDS編）] - DatabaseTemplate
 
 
-# ------------------------------------------------------------
+# ------------------------------------------------------------#
 # Input Parameters
-# ------------------------------------------------------------
+# ------------------------------------------------------------# 
+Parameters:
+  chibiDBEngineName:
+    Type: String
+    Default: "rds"
+  chibiMySQLMajorVersion:
+    Type: String
+    Default: "5.7"
+    AllowedValues: [ "5.5", "5.6", "5.7" ]
+  chibiMySQLMinorVersion:
+    Type: String
+    Default: "22"
+  DBInstanceClass:
+    Type: String
+    Default: "db.m4.large" 
+  chibiDBEngineStorageSize:
+    Type: String
+    Default: "30"
+  chibiDBEngineStorageType:
+    Type: String
+    Default: "gp2"
+  DBName:
+    Type: String
+    Default: "db"
+  chibiDBMasterUserName:
+    Type: String
+    Default: "dbuser"
+    NoEcho: true
+    MinLength: 1
+    MaxLength: 16
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: "must begin with a letter and contain only alphanumeric characters."
+  chibiDBPassword: 
+    Default: "chibiDBPassword"
+    NoEcho: true
+    Type: String
+    MinLength: 8
+    MaxLength: 41
+    AllowedPattern: "[a-zA-Z0-9]*"
+    ConstraintDescription: "must contain only alphanumeric characters."
+  MultiAZ: 
+    Default: "true"
+    Type: String
+    AllowedValues: [ "true", "false" ]
 
 
+### Resources ###
+Resources: 
+# ------------------------------------------------------------#
+#  DBEngine
+# ------------------------------------------------------------#
+  chibiDBEngine: 
+    Type: "AWS::RDS::DBInstance"
+    Properties: 
+      DBInstanceIdentifier: !Sub "${chibiDBEngineName}"
+      Engine: MySQL
+      EngineVersion: !Sub "${chibiMySQLMajorVersion}.${chibiMySQLMinorVersion}"
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: !Ref chibiDBEngineStorageSize
+      StorageType: !Ref chibiDBEngineStorageType
+      DBName: !Ref DBName
+      MasterUsername: !Ref chibiDBMasterUserName
+      MasterUserPassword: !Ref chibiDBPassword
+      DBSubnetGroupName: !Ref chibiDBSubnetGroup
+      PubliclyAccessible: false
+      MultiAZ: !Ref MultiAZ
+      PreferredBackupWindow: "18:00-18:30"
+      PreferredMaintenanceWindow: "sat:19:00-sat:19:30"
+      AutoMinorVersionUpgrade: false
+      DBParameterGroupName: !Ref DBParameterGroup  
+      VPCSecurityGroups:
+        - !ImportValue chibi-cfn-db-sg
+      CopyTagsToSnapshot: true
+      BackupRetentionPeriod: 7
+      Tags: 
+        - Key: "Name"
+          Value: !Ref chibiDBEngineName
+    DeletionPolicy: "Delete"
+    
+    
+# ------------------------------------------------------------#
+#  DBSubnetGroup
+# ------------------------------------------------------------#
+  chibiDBSubnetGroup: 
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties: 
+      DBSubnetGroupName: !Sub "${chibiDBEngineName}-subnet"
+      DBSubnetGroupDescription: "-"
+      SubnetIds: 
+        - !ImportValue chibi-cfn-private-subnet-a
+        - !ImportValue chibi-cfn-private-subnet-c
 
 
+# ------------------------------------------------------------#
+#  DBParameterGroup
+# ------------------------------------------------------------#
+  DBParameterGroup:
+    Type: "AWS::RDS::DBParameterGroup"
+    Properties:
+      Family: !Sub "MySQL${chibiMySQLMajorVersion}"
+      Description: !Sub "${chibiDBEngineName}-parm"
+      
 
+# ------------------------------------------------------------#
+# Output Parameters
+# ------------------------------------------------------------#                
+Outputs:
+
+### DBEngine ###
+  chibiDBEngine:
+    Value: !Ref chibiDBEngine
+    Export:
+      Name: !Sub "${chibiDBEngineName}-id"
+      
+### DBEndopoint ###
+  DBInstanceEndpoint:
+    Value: !GetAtt chibiDBEngine.Endpoint.Address
+    Export:
+      Name: !Sub "${chibiDBEngineName}-endpoint"
+      
+### DBName ###
+  DBName:
+    Value: !Ref DBName
+    Export:
+      Name: !Sub "${chibiDBEngineName}-DBName"
 
 

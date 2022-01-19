@@ -12,7 +12,10 @@ Parameters:
   PublicSubnetCIDR:
     Type: String
     Default: "192.168.1.0/24"
-  PrivateSubnetCIDR:
+  PrivateSubnetACIDR:
+    Type: String
+    Default: "192.168.2.0/24"
+  PrivateSubnetCCIDR:
     Type: String
     Default: "192.168.3.0/24"
     
@@ -54,6 +57,7 @@ Resources:
 # ------------------------------------------------------------
 # Subnet
 # ------------------------------------------------------------
+### Public Subnet ###
   chibiPublicSubnetA: 
     Type: "AWS::EC2::Subnet"
     Properties: 
@@ -64,20 +68,32 @@ Resources:
         - Key: Name
           Value: "chibi-cfn-public-subnet-a"
 
+### Private Subnet ###
   chibiPrivateSubnetA: 
     Type: "AWS::EC2::Subnet"
     Properties: 
       AvailabilityZone: "ap-northeast-1a"
-      CidrBlock: !Ref PrivateSubnetCIDR
+      CidrBlock: !Ref PrivateSubnetACIDR
       VpcId: !Ref chibiVPC 
       Tags: 
         - Key: Name
           Value: "chibi-cfn-private-subnet-a"
+  
+  chibiPrivateSubnetC: 
+    Type: "AWS::EC2::Subnet"
+    Properties: 
+      AvailabilityZone: "ap-northeast-1c"
+      CidrBlock: !Ref PrivateSubnetCCIDR
+      VpcId: !Ref chibiVPC 
+      Tags: 
+        - Key: Name
+          Value: "chibi-cfn-private-subnet-c"
 
 
 # ------------------------------------------------------------
 # RouteTable
 # ------------------------------------------------------------
+### Public Subnet Routing ###
   chibiPublicRTB: 
     Type: "AWS::EC2::RouteTable"
     Properties: 
@@ -99,7 +115,8 @@ Resources:
       DestinationCidrBlock: "0.0.0.0/0"
       GatewayId: !Ref chibiIGW 
 
-  chibiPrivateRTB: 
+### Private Subnet Routing ###
+  chibiPrivateARTB: 
     Type: "AWS::EC2::RouteTable"
     Properties: 
       VpcId: !Ref chibiVPC 
@@ -107,11 +124,27 @@ Resources:
         - Key: Name
           Value: "chibi-cfn-private-route-a"
 
-  chibiPrivateSubnetRTBAssociation: 
+  chibiPrivateSubnetRTBAAssociation: 
     Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties: 
       SubnetId: !Ref chibiPrivateSubnetA
-      RouteTableId: !Ref chibiPrivateRTB
+      RouteTableId: !Ref chibiPrivateARTB
+  
+### Private Subnet Routing ###
+  chibiPrivateCRTB: 
+    Type: "AWS::EC2::RouteTable"
+    Properties: 
+      VpcId: !Ref chibiVPC 
+      Tags: 
+        - Key: Name
+          Value: "chibi-cfn-private-route-c"
+
+  chibiPrivateSubnetRTBCAssociation: 
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties: 
+      SubnetId: !Ref chibiPrivateSubnetC
+      RouteTableId: !Ref chibiPrivateCRTB
+
 
 # ------------------------------------------------------------
 # Output Parameter
@@ -143,11 +176,21 @@ Outputs:
     Value: !Ref chibiPrivateSubnetA
     Export:
       Name: "chibi-cfn-private-subnet-a"
+  
+  chibiPrivateSubnetC:
+    Value: !Ref chibiPrivateSubnetC
+    Export:
+      Name: "chibi-cfn-private-subnet-c"
 
-  PrivateSubnetCIDR:
-    Value: !Ref PrivateSubnetCIDR
+  PrivateSubnetACIDR:
+    Value: !Ref PrivateSubnetACIDR
     Export:
       Name: "chibi-cfn-private-subnet-a-cidr"
+      
+  PrivateSubnetCCIDR:
+    Value: !Ref PrivateSubnetCCIDR
+    Export:
+      Name: "chibi-cfn-private-subnet-c-cidr"
       
 ### RouteTable ###
   chibiPublicRTB:
@@ -155,7 +198,13 @@ Outputs:
     Export:
       Name: "chibi-cfn-public-route-a"
 
-  chibiPrivateRTB:
-    Value: !Ref chibiPrivateRTB
+  chibiPrivateARTB:
+    Value: !Ref chibiPrivateARTB
     Export:
       Name: "chibi-cfn-private-route-a"
+  
+  chibiPrivateCRTB:
+    Value: !Ref chibiPrivateCRTB
+    Export:
+      Name: "chibi-cfn-private-route-c"
+
