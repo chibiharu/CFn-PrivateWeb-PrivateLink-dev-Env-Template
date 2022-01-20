@@ -45,7 +45,7 @@ Parameters:
     AllowedPattern: "[a-zA-Z0-9]*"
     ConstraintDescription: "must contain only alphanumeric characters."
   MultiAZ: 
-    Default: "true"
+    Default: "false"
     Type: String
     AllowedValues: [ "true", "false" ]
 

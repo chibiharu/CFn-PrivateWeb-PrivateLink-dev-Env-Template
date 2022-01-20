@@ -2,18 +2,30 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: chibiharu's Qiita [【AWS】CloudFormationでWebサーバを構築①（NW編）] - SecurityTemplate
 
 
+# ------------------------------------------------------------
+# Input Parameters
+# ------------------------------------------------------------
+Parameters:
+### Project Prefix ###
+  PJPrefix:
+    Type: String
+    
+
 ### Resources ###
 Resources:
 # ------------------------------------------------------------
 # SecurityGroup
 # ------------------------------------------------------------
-### Web Server Security Group ###
-    chibiWebSG:
+### ALB Server Security Group ###
+    chibiALBSG:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
             GroupDescription: "http,https public"
-            GroupName: cfn-dev-web-sg
-            VpcId: !ImportValue "chibi-cfn-vpc"
+            GroupName: cfn-dev-alb-sg
+            VpcId: { "Fn::ImportValue": !Sub "${PJPrefix}-vpc" }
+            Tags: 
+                - Key: Name
+                  Value: !Sub "${PJPrefix}-alb-sg"
             SecurityGroupIngress:
                 IpProtocol: tcp
                 FromPort : 80
@@ -23,6 +35,22 @@ Resources:
                 FromPort : 443
                 ToPort : 443
                 CidrIp: 0.0.0.0/0
+                
+### Web Server Security Group ###
+    chibiWebSG:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "http public"
+            GroupName: cfn-dev-web-sg
+            VpcId: { "Fn::ImportValue": !Sub "${PJPrefix}-vpc" }
+            Tags: 
+                - Key: Name
+                  Value: !Sub "${PJPrefix}-web-sg"
+            SecurityGroupIngress:
+                IpProtocol: tcp
+                FromPort : 80
+                ToPort : 80
+                SourceSecurityGroupId: !Ref chibiALBSG
 
 ### Database Server Security Group ###            
     chibidbSG:
@@ -30,7 +58,10 @@ Resources:
         Properties:
             GroupDescription: "db private"
             GroupName: cfn-dev-db-sg
-            VpcId: !ImportValue "chibi-cfn-vpc"
+            VpcId: { "Fn::ImportValue": !Sub "${PJPrefix}-vpc" }
+            Tags: 
+                - Key: Name
+                  Value: !Sub "${PJPrefix}-db-sg"
             SecurityGroupIngress:
                 IpProtocol: tcp
                 FromPort : 3306
@@ -43,11 +74,15 @@ Resources:
 # ------------------------------------------------------------
 Outputs:
 ### SecurityGroup ###
+    chibiALBSG:
+        Value: !Ref chibiALBSG
+        Export:
+            Name: !Sub "${PJPrefix}-alb-sg"
     chibiWebSG:
         Value: !Ref chibiWebSG
         Export:
-            Name: "chibi-cfn-web-sg"
+            Name: !Sub "${PJPrefix}-web-sg"
     chibidbSG:
         Value: !Ref chibidbSG
         Export:
-            Name: "chibi-cfn-db-sg"
+            Name: !Sub "${PJPrefix}-db-sg"

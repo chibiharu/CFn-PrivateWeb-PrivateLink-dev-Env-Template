@@ -1,0 +1,16 @@
+# ------------------------------------------------------------
+# EIP
+# ------------------------------------------------------------           
+  chibiEIP:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: vpc
+
+  chibiEIPAssociate:
+    Type: AWS::EC2::EIPAssociation
+    Properties: 
+      InstanceId: !Ref chibiEC2
+      EIP: !Ref chibiEIP
+      
+      
+      server.ymlが途中　2022年０１・２１
