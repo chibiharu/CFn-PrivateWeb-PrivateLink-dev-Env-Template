@@ -1,21 +1,28 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: chibiharu's Qiita [【AWS】CloudFormationでWebサーバを構築②（EC2&RDS編）] - DatabaseTemplate
+Description: chibiharu's Qiita [【AWS】CloudFormationでWebサーバを構築③（RDS編）] - DatabaseTemplate
 
 
 # ------------------------------------------------------------#
 # Input Parameters
 # ------------------------------------------------------------# 
 Parameters:
+### Project Prefix ###
+  PJPrefix:
+    Type: String
+### RDS Name ###
   chibiDBEngineName:
     Type: String
-    Default: "rds"
+    Default: "QiitaWebEnvRDSForMySQL"
+### RDS Database type & Major version ###
   chibiMySQLMajorVersion:
     Type: String
     Default: "5.7"
     AllowedValues: [ "5.5", "5.6", "5.7" ]
+### RDS Database type & Minor version ###
   chibiMySQLMinorVersion:
     Type: String
     Default: "22"
+### Instnce Options ###
   DBInstanceClass:
     Type: String
     Default: "db.m4.large" 
@@ -25,9 +32,11 @@ Parameters:
   chibiDBEngineStorageType:
     Type: String
     Default: "gp2"
+### Database name ###
   DBName:
     Type: String
-    Default: "db"
+    Default: "QiitaWebEnvDB"
+### User Options ###
   chibiDBMasterUserName:
     Type: String
     Default: "dbuser"
@@ -37,13 +46,14 @@ Parameters:
     AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
     ConstraintDescription: "must begin with a letter and contain only alphanumeric characters."
   chibiDBPassword: 
-    Default: "chibiDBPassword"
+    Default: "DBPassword"
     NoEcho: true
     Type: String
     MinLength: 8
     MaxLength: 41
     AllowedPattern: "[a-zA-Z0-9]*"
     ConstraintDescription: "must contain only alphanumeric characters."
+### AZ options ###
   MultiAZ: 
     Default: "false"
     Type: String
@@ -53,7 +63,7 @@ Parameters:
 ### Resources ###
 Resources: 
 # ------------------------------------------------------------#
-#  DBEngine
+#  DB - Engine
 # ------------------------------------------------------------#
   chibiDBEngine: 
     Type: "AWS::RDS::DBInstance"
@@ -73,9 +83,9 @@ Resources:
       PreferredBackupWindow: "18:00-18:30"
       PreferredMaintenanceWindow: "sat:19:00-sat:19:30"
       AutoMinorVersionUpgrade: false
-      DBParameterGroupName: !Ref DBParameterGroup  
+      DBParameterGroupName: !Ref chibiDBParameterGroup  
       VPCSecurityGroups:
-        - !ImportValue chibi-cfn-db-sg
+        - { "Fn::ImportValue": !Sub "${PJPrefix}-db-sg" }
       CopyTagsToSnapshot: true
       BackupRetentionPeriod: 7
       Tags: 
@@ -85,7 +95,7 @@ Resources:
     
     
 # ------------------------------------------------------------#
-#  DBSubnetGroup
+#  DB - SubnetGroup
 # ------------------------------------------------------------#
   chibiDBSubnetGroup: 
     Type: "AWS::RDS::DBSubnetGroup"
@@ -93,14 +103,14 @@ Resources:
       DBSubnetGroupName: !Sub "${chibiDBEngineName}-subnet"
       DBSubnetGroupDescription: "-"
       SubnetIds: 
-        - !ImportValue chibi-cfn-private-subnet-a
-        - !ImportValue chibi-cfn-private-subnet-c
+        - { "Fn::ImportValue": !Sub "${PJPrefix}-private-subnet-a" }
+        - { "Fn::ImportValue": !Sub "${PJPrefix}-private-subnet-c" }
 
 
 # ------------------------------------------------------------#
-#  DBParameterGroup
+#  DB - ParameterGroup
 # ------------------------------------------------------------#
-  DBParameterGroup:
+  chibiDBParameterGroup:
     Type: "AWS::RDS::DBParameterGroup"
     Properties:
       Family: !Sub "MySQL${chibiMySQLMajorVersion}"

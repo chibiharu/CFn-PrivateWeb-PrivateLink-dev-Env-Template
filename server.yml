@@ -17,13 +17,46 @@ Parameters:
   HostedZoneName:
     Type: String
     Description: DNS Name to create
-    Default: chibiharujijimasa.work
+    Default: 'example.com'
     AllowedPattern: (?!-)[a-zA-Z0-9-.]{1,63}(?<!-)
     ConstraintDescription: must be a valid DNS zone name
+  SubDomain:
+    Description: FQDN of the certificate
+    Type: String
+    Default: 'www.example.com'
     
 
 ### Resources ###
 Resources: 
+# ------------------------------------------------------------
+# IAM Role
+# ------------------------------------------------------------
+  chibiSSMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      RoleName: !Sub "${PJPrefix}-SSMRole"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      MaxSessionDuration: 3600
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+
+  chibiSSMRoleProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref chibiSSMRole
+
+
 # ------------------------------------------------------------
 # EC2
 # ------------------------------------------------------------
@@ -33,6 +66,7 @@ Resources:
     Properties: 
       ImageId: ami-032d6db78f84e8bf5
       InstanceType: t2.micro
+      IamInstanceProfile: !Ref chibiSSMRoleProfile
       KeyName: !Ref KeyName
       NetworkInterfaces: 
         - AssociatePublicIpAddress: "true"
@@ -48,6 +82,8 @@ Resources:
           sudo systemctl start httpd
           sudo systemctl enable httpd
           sudo echo "chibiharu's Qiita Apache Test Page For Success AZ-a" > /var/www/html/index.html
+          sudo systemctl start amazon-ssm-agent.service
+          sudo systemctl enable amazon-ssm-agent.service
       Tags:
           - Key: Name
             Value: !Sub "${PJPrefix}-web-server-1a"
@@ -58,6 +94,7 @@ Resources:
     Properties: 
       ImageId: ami-032d6db78f84e8bf5
       InstanceType: t2.micro
+      IamInstanceProfile: !Ref chibiSSMRoleProfile
       KeyName: !Ref KeyName
       NetworkInterfaces: 
         - AssociatePublicIpAddress: "true"
@@ -73,15 +110,99 @@ Resources:
           sudo systemctl start httpd
           sudo systemctl enable httpd
           sudo echo "chibiharu's Qiita Apache Test Page For Success AZ-c" > /var/www/html/index.html
+          sudo systemctl start amazon-ssm-agent.service
+          sudo systemctl enable amazon-ssm-agent.service
       Tags:
           - Key: Name
             Value: !Sub "${PJPrefix}-web-server-1c"
             
 
 # ------------------------------------------------------------
-# Application Load Balancer
+# Target Group
 # ------------------------------------------------------------
+  chibiTG: 
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties: 
+      VpcId: { "Fn::ImportValue": !Sub "${PJPrefix}-vpc" } 
+      Name: !Sub "${PJPrefix}-tg"
+      Protocol: HTTP
+      Port: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: "/"
+      HealthCheckPort: "traffic-port"
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      HealthCheckTimeoutSeconds: 5
+      HealthCheckIntervalSeconds: 10
+      Matcher: 
+        HttpCode: 200
+      Tags: 
+        - Key: Name
+          Value: !Sub "${PJPrefix}-${chibiALB}-tg"
+      TargetGroupAttributes: 
+        - Key: "deregistration_delay.timeout_seconds"
+          Value: 300
+        - Key: "stickiness.enabled"
+          Value: false
+        - Key: "stickiness.type"
+          Value: lb_cookie
+        - Key: "stickiness.lb_cookie.duration_seconds"
+          Value: 86400
+      Targets: 
+        - Id: !Ref chibiEC21a
+        - Id: !Ref chibiEC21c
+          Port: 80
 
+
+# ------------------------------------------------------------
+# Application Load balancer
+# ------------------------------------------------------------
+### ALB ###
+  chibiALB: 
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Properties: 
+      Name: !Sub "${PJPrefix}-alb"
+      Scheme: "internet-facing"
+      LoadBalancerAttributes: 
+        - Key: "deletion_protection.enabled"
+          Value: false
+        - Key: "idle_timeout.timeout_seconds"
+          Value: 4000
+      SecurityGroups:
+        - { "Fn::ImportValue": !Sub "${PJPrefix}-alb-sg" } 
+      Subnets: 
+        - { "Fn::ImportValue": !Sub "${PJPrefix}-public-subnet-a" } 
+        - { "Fn::ImportValue": !Sub "${PJPrefix}-public-subnet-c" }
+        
+### Listener HTTP ###
+  chibiALBListenerHTTP: 
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties: 
+      Port: 80
+      Protocol: HTTP
+      DefaultActions: 
+        - Type: redirect
+          RedirectConfig: 
+            Host: '#{host}'
+            Path: '/#{path}'
+            Port: 443
+            Protocol: HTTPS
+            Query: '#{query}'
+            StatusCode: HTTP_301
+      LoadBalancerArn: !Ref chibiALB
+      
+### Listener HTTPS ###
+  chibiALBListenerHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref chibiACM
+      DefaultActions:
+        - TargetGroupArn: !Ref chibiTG
+          Type: forward
+      LoadBalancerArn: !Ref chibiALB
 
 
 # ------------------------------------------------------------
@@ -95,18 +216,30 @@ Resources:
       - Key: Name
         Value: chibi-cfn-hostedzone
 
-  PrimaryDNSRecord:
+  chibiDNSRecord:
     Type: AWS::Route53::RecordSet
-    DependsOn: HostedZone
     Properties:
-      HostedZoneId: !Ref HostedZone
-      Comment: DNS Name for Elastic IP Address
-      Name: !Join ["", [www, ".", !Ref HostedZoneName, "."] ]
+      HostedZoneId: !Sub '${HostedZone}'
+      Comment: "alias to alb"
+      Name: !Sub '${SubDomain}'
       Type: A
-      TTL: 60
-      ResourceRecords:
-      - !Ref chibiEIP
+      AliasTarget:
+        HostedZoneId: !GetAtt 'chibiALB.CanonicalHostedZoneID'
+        DNSName: !GetAtt 'chibiALB.DNSName'
         
+        
+# ------------------------------------------------------------
+# ACM
+# ------------------------------------------------------------
+  chibiACM:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Sub '${SubDomain}'
+      DomainValidationOptions:
+        - DomainName: !Sub '${SubDomain}'
+          HostedZoneId: !Sub '${HostedZone}'
+      ValidationMethod: DNS
+      
 
 # ------------------------------------------------------------
 # Output Parameter
@@ -121,7 +254,5 @@ Outputs:
     Value: !Ref chibiEC21c
     Export:
       Name: !Sub "${PJPrefix}-web-server-1c"
-
-
 
 
