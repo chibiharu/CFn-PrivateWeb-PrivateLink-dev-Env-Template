@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: chibiharu's Qiita [【AWS】CloudFormationでWebサーバを構築②（EC2編）] - ServerTemplate
+Description: Web2tier-Server-Template
 
 
 # ------------------------------------------------------------
@@ -17,21 +17,21 @@ Parameters:
   HostedZoneName:
     Type: String
     Description: DNS Name to create
-    Default: 'example.com'
+    Default: '<<ドメイン(example.com)>>'
     AllowedPattern: (?!-)[a-zA-Z0-9-.]{1,63}(?<!-)
     ConstraintDescription: must be a valid DNS zone name
   SubDomain:
     Description: FQDN of the certificate
     Type: String
-    Default: 'www.example.com'
+    Default: 'www.<<ドメイン(example.com)>>'
     
-
+    
 ### Resources ###
 Resources: 
 # ------------------------------------------------------------
 # IAM Role
 # ------------------------------------------------------------
-  chibiSSMRole:
+  SSMRole:
     Type: AWS::IAM::Role
     Properties:
       Path: /
@@ -49,29 +49,29 @@ Resources:
       ManagedPolicyArns: 
         - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
 
-  chibiSSMRoleProfile:
+  SSMRoleProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
       Path: /
       Roles:
-        - !Ref chibiSSMRole
-
-
+        - !Ref SSMRole
+        
+        
 # ------------------------------------------------------------
 # EC2
 # ------------------------------------------------------------
 ### AvailabilityZone-A ###
-  chibiEC21a: 
+  EC2WebA: 
     Type: AWS::EC2::Instance
     Properties: 
       ImageId: ami-032d6db78f84e8bf5
       InstanceType: t2.micro
-      IamInstanceProfile: !Ref chibiSSMRoleProfile
+      IamInstanceProfile: !Ref SSMRoleProfile
       KeyName: !Ref KeyName
       NetworkInterfaces: 
         - AssociatePublicIpAddress: "true"
           DeviceIndex: "0"
-          SubnetId: { "Fn::ImportValue": !Sub "${PJPrefix}-public-subnet-a" }
+          SubnetId: { "Fn::ImportValue": !Sub "${PJPrefix}-private-subnet-a" }
           GroupSet:
             - { "Fn::ImportValue": !Sub "${PJPrefix}-web-sg" }
       UserData:
@@ -89,17 +89,17 @@ Resources:
             Value: !Sub "${PJPrefix}-web-server-1a"
             
 ### AvailabilityZone-C ###
-  chibiEC21c: 
+  EC2WebC: 
     Type: AWS::EC2::Instance
     Properties: 
       ImageId: ami-032d6db78f84e8bf5
       InstanceType: t2.micro
-      IamInstanceProfile: !Ref chibiSSMRoleProfile
+      IamInstanceProfile: !Ref SSMRoleProfile
       KeyName: !Ref KeyName
       NetworkInterfaces: 
         - AssociatePublicIpAddress: "true"
           DeviceIndex: "0"
-          SubnetId: { "Fn::ImportValue": !Sub "${PJPrefix}-public-subnet-c" }
+          SubnetId: { "Fn::ImportValue": !Sub "${PJPrefix}-private-subnet-c" }
           GroupSet:
             - { "Fn::ImportValue": !Sub "${PJPrefix}-web-sg" }
       UserData:
@@ -116,11 +116,11 @@ Resources:
           - Key: Name
             Value: !Sub "${PJPrefix}-web-server-1c"
             
-
+            
 # ------------------------------------------------------------
 # Target Group
 # ------------------------------------------------------------
-  chibiTG: 
+  TargetGroup:
     Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
     Properties: 
       VpcId: { "Fn::ImportValue": !Sub "${PJPrefix}-vpc" } 
@@ -138,7 +138,7 @@ Resources:
         HttpCode: 200
       Tags: 
         - Key: Name
-          Value: !Sub "${PJPrefix}-${chibiALB}-tg"
+          Value: !Sub "${PJPrefix}-${ALB}-tg"
       TargetGroupAttributes: 
         - Key: "deregistration_delay.timeout_seconds"
           Value: 300
@@ -149,16 +149,16 @@ Resources:
         - Key: "stickiness.lb_cookie.duration_seconds"
           Value: 86400
       Targets: 
-        - Id: !Ref chibiEC21a
-        - Id: !Ref chibiEC21c
+        - Id: !Ref EC2WebA
+        - Id: !Ref EC2WebC
           Port: 80
-
-
+          
+          
 # ------------------------------------------------------------
 # Application Load balancer
 # ------------------------------------------------------------
 ### ALB ###
-  chibiALB: 
+  ALB: 
     Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
     Properties: 
       Name: !Sub "${PJPrefix}-alb"
@@ -175,7 +175,7 @@ Resources:
         - { "Fn::ImportValue": !Sub "${PJPrefix}-public-subnet-c" }
         
 ### Listener HTTP ###
-  chibiALBListenerHTTP: 
+  ALBListenerHTTP: 
     Type: "AWS::ElasticLoadBalancingV2::Listener"
     Properties: 
       Port: 80
@@ -189,22 +189,22 @@ Resources:
             Protocol: HTTPS
             Query: '#{query}'
             StatusCode: HTTP_301
-      LoadBalancerArn: !Ref chibiALB
+      LoadBalancerArn: !Ref ALB
       
 ### Listener HTTPS ###
-  chibiALBListenerHTTPS:
+  ALBListenerHTTPS:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       Port: 443
       Protocol: HTTPS
       Certificates:
-        - CertificateArn: !Ref chibiACM
+        - CertificateArn: !Ref ACM
       DefaultActions:
-        - TargetGroupArn: !Ref chibiTG
+        - TargetGroupArn: !Ref TargetGroup
           Type: forward
-      LoadBalancerArn: !Ref chibiALB
-
-
+      LoadBalancerArn: !Ref ALB
+      
+      
 # ------------------------------------------------------------
 # Route53
 # ------------------------------------------------------------
@@ -214,9 +214,9 @@ Resources:
       Name: !Ref HostedZoneName
       HostedZoneTags:
       - Key: Name
-        Value: chibi-cfn-hostedzone
-
-  chibiDNSRecord:
+        Value: !Sub "${PJPrefix}-cfn-hostedzone"
+        
+  DNSRecord:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId: !Sub '${HostedZone}'
@@ -224,14 +224,14 @@ Resources:
       Name: !Sub '${SubDomain}'
       Type: A
       AliasTarget:
-        HostedZoneId: !GetAtt 'chibiALB.CanonicalHostedZoneID'
-        DNSName: !GetAtt 'chibiALB.DNSName'
+        HostedZoneId: !GetAtt 'ALB.CanonicalHostedZoneID'
+        DNSName: !GetAtt 'ALB.DNSName'
         
         
 # ------------------------------------------------------------
 # ACM
 # ------------------------------------------------------------
-  chibiACM:
+  ACM:
     Type: AWS::CertificateManager::Certificate
     Properties:
       DomainName: !Sub '${SubDomain}'
@@ -240,19 +240,17 @@ Resources:
           HostedZoneId: !Sub '${HostedZone}'
       ValidationMethod: DNS
       
-
+      
 # ------------------------------------------------------------
 # Output Parameter
 # ------------------------------------------------------------
 Outputs:
 ### EC2 ###
-  chibiEC21a:
-    Value: !Ref chibiEC21a
+  EC2WebA:
+    Value: !Ref EC2WebA
     Export:
       Name: !Sub "${PJPrefix}-web-server-1a"
-  chibiEC21c:
-    Value: !Ref chibiEC21c
+  EC2WebC:
+    Value: !Ref EC2WebC
     Export:
       Name: !Sub "${PJPrefix}-web-server-1c"
-
-

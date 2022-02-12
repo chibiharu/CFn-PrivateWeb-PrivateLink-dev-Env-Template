@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: chibiharu's Qiita [【AWS】CloudFormationでWebサーバを構築①（NW編）] - NetworkTemplate
+Description: Web2tier-Network-Template
     
 
 # ------------------------------------------------------------
@@ -34,7 +34,7 @@ Resources:
 # ------------------------------------------------------------
 # VPC
 # ------------------------------------------------------------
-  chibiVPC: 
+  VPC: 
     Type: "AWS::EC2::VPC"
     Properties: 
       CidrBlock: !Ref VPCCIDR
@@ -49,220 +49,212 @@ Resources:
 # ------------------------------------------------------------
 # InternetGateway:
 # ------------------------------------------------------------
-  chibiIGW: 
+  InternetGateway: 
     Type: "AWS::EC2::InternetGateway"
     Properties: 
       Tags: 
         - Key: Name
           Value: !Sub "${PJPrefix}-igw"
           
-  chibiIGWAttachment: 
+  IGWAttachment: 
     Type: "AWS::EC2::VPCGatewayAttachment"
     Properties: 
-      InternetGatewayId: !Ref chibiIGW
-      VpcId: !Ref chibiVPC
-
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
       
+      
+# ------------------------------------------------------------
+# NatGateway
+# ------------------------------------------------------------
+### NAT Gateway ###
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - NatGatewayEIP
+          - AllocationId
+      SubnetId: !Ref PublicSubnetA
+      Tags:
+        - Key: Name
+          Value: !Sub "${PJPrefix}-NAT-Gateway"
+          
+### NAT Gateway EIP ###
+  NatGatewayEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${PJPrefix}-NGW-EIP" 
+          
+          
 # ------------------------------------------------------------
 # Subnet
 # ------------------------------------------------------------
 ### Public Subnet ###
-  chibiPublicSubnetA: 
+  PublicSubnetA: 
     Type: "AWS::EC2::Subnet"
     Properties: 
       AvailabilityZone: "ap-northeast-1a"
       CidrBlock: !Ref PublicSubnetACIDR
-      VpcId: !Ref chibiVPC 
+      VpcId: !Ref VPC 
       Tags: 
         - Key: Name
           Value: !Sub "${PJPrefix}-public-subnet-a"
           
-  chibiPublicSubnetC: 
+  PublicSubnetC: 
     Type: "AWS::EC2::Subnet"
     Properties: 
       AvailabilityZone: "ap-northeast-1c"
       CidrBlock: !Ref PublicSubnetCCIDR
-      VpcId: !Ref chibiVPC 
+      VpcId: !Ref VPC 
       Tags: 
         - Key: Name
           Value: !Sub "${PJPrefix}-public-subnet-c"
 
 ### Private Subnet ###
-  chibiPrivateSubnetA: 
+  PrivateSubnetA: 
     Type: "AWS::EC2::Subnet"
     Properties: 
       AvailabilityZone: "ap-northeast-1a"
       CidrBlock: !Ref PrivateSubnetACIDR
-      VpcId: !Ref chibiVPC 
+      VpcId: !Ref VPC 
       Tags: 
         - Key: Name
           Value: !Sub "${PJPrefix}-private-subnet-a"
   
-  chibiPrivateSubnetC: 
+  PrivateSubnetC: 
     Type: "AWS::EC2::Subnet"
     Properties: 
       AvailabilityZone: "ap-northeast-1c"
       CidrBlock: !Ref PrivateSubnetCCIDR
-      VpcId: !Ref chibiVPC 
+      VpcId: !Ref VPC 
       Tags: 
         - Key: Name
           Value: !Sub "${PJPrefix}-private-subnet-c"
-
-
+          
+          
 # ------------------------------------------------------------
 # RouteTable
 # ------------------------------------------------------------
 ### Public Subnet A Routing ###
-  chibiPublicARTB: 
+  PublicARTB: 
     Type: "AWS::EC2::RouteTable"
     Properties: 
-      VpcId: !Ref chibiVPC 
+      VpcId: !Ref VPC 
       Tags: 
         - Key: Name
           Value: !Sub "${PJPrefix}-public-route-a"
 
-  chibiPublicASubnetRTBAssociation: 
+  PublicASubnetRTBAssociation: 
     Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties: 
-      SubnetId: !Ref chibiPublicSubnetA 
-      RouteTableId: !Ref chibiPublicARTB
+      SubnetId: !Ref PublicSubnetA 
+      RouteTableId: !Ref PublicARTB
 
-  chibiPublicARoute: 
+  PublicARoute: 
     Type: "AWS::EC2::Route"
     Properties: 
-      RouteTableId: !Ref chibiPublicARTB
+      RouteTableId: !Ref PublicARTB
       DestinationCidrBlock: "0.0.0.0/0"
-      GatewayId: !Ref chibiIGW 
+      GatewayId: !Ref InternetGateway
       
 ### Public Subnet C Routing ###
-      
-  chibiPublicCRTB: 
+  PublicCRTB: 
     Type: "AWS::EC2::RouteTable"
     Properties: 
-      VpcId: !Ref chibiVPC 
+      VpcId: !Ref VPC 
       Tags: 
         - Key: Name
           Value: !Sub "${PJPrefix}-public-route-c"
 
-  chibiPublicCSubnetRTBAssociation: 
+  PublicCSubnetRTBAssociation: 
     Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties: 
-      SubnetId: !Ref chibiPublicSubnetC
-      RouteTableId: !Ref chibiPublicCRTB
+      SubnetId: !Ref PublicSubnetC
+      RouteTableId: !Ref PublicCRTB
 
-  chibiPublicCRoute: 
+  PublicCRoute: 
     Type: "AWS::EC2::Route"
     Properties: 
-      RouteTableId: !Ref chibiPublicCRTB
+      RouteTableId: !Ref PublicCRTB
       DestinationCidrBlock: "0.0.0.0/0"
-      GatewayId: !Ref chibiIGW 
+      GatewayId: !Ref InternetGateway 
 
 ### Private Subnet A Routing ###
-  chibiPrivateARTB: 
+  PrivateARTB: 
     Type: "AWS::EC2::RouteTable"
     Properties: 
-      VpcId: !Ref chibiVPC 
+      VpcId: !Ref VPC 
       Tags: 
         - Key: Name
           Value: !Sub "${PJPrefix}-private-route-a"
 
-  chibiPrivateSubnetRTBAAssociation: 
+  PrivateSubnetRTBAAssociation: 
     Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties: 
-      SubnetId: !Ref chibiPrivateSubnetA
-      RouteTableId: !Ref chibiPrivateARTB
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateARTB
+      
+  PrivateRouteA01: 
+    Type: "AWS::EC2::Route"
+    Properties: 
+      RouteTableId: !Ref PrivateARTB
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref NatGateway
   
 ### Private Subnet C Routing ###
-  chibiPrivateCRTB: 
+  PrivateCRTB: 
     Type: "AWS::EC2::RouteTable"
     Properties: 
-      VpcId: !Ref chibiVPC 
+      VpcId: !Ref VPC 
       Tags: 
         - Key: Name
           Value: !Sub "${PJPrefix}-private-route-c"
-
-  chibiPrivateSubnetRTBCAssociation: 
+          
+  PrivateSubnetRTBCAssociation: 
     Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties: 
-      SubnetId: !Ref chibiPrivateSubnetC
-      RouteTableId: !Ref chibiPrivateCRTB
-
-
+      SubnetId: !Ref PrivateSubnetC
+      RouteTableId: !Ref PrivateCRTB
+      
+  PrivateRouteC01: 
+    Type: "AWS::EC2::Route"
+    Properties: 
+      RouteTableId: !Ref PrivateCRTB
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref NatGateway
+      
+      
 # ------------------------------------------------------------
 # Output Parameter
 # ------------------------------------------------------------
 Outputs:
 ### VPC ###
-  chibiVPC:
-    Value: !Ref chibiVPC
+  VPC:
+    Value: !Ref VPC
     Export:
       Name: !Sub "${PJPrefix}-vpc"
-
-  VPCCIDR:
-    Value: !Ref VPCCIDR
-    Export:
-      Name: !Sub "${PJPrefix}-vpc-cidr"
       
 ### Subnet ###
 ## Public Subnet A ##
-  chibiPublicSubnetA:
-    Value: !Ref chibiPublicSubnetA
+  PublicSubnetA:
+    Value: !Ref PublicSubnetA
     Export:
       Name: !Sub "${PJPrefix}-public-subnet-a"
-
-  PublicSubnetACIDR:
-    Value: !Ref PublicSubnetACIDR
-    Export:
-      Name: !Sub "${PJPrefix}-public-subnet-a-cidr"
 ## Public Subnet C ##
-  chibiPublicSubnetC:
-    Value: !Ref chibiPublicSubnetC
+  PublicSubnetC:
+    Value: !Ref PublicSubnetC
     Export:
       Name: !Sub "${PJPrefix}-public-subnet-c"
-
-  PublicSubnetCCIDR:
-    Value: !Ref PublicSubnetCCIDR
-    Export:
-      Name: !Sub "${PJPrefix}-public-subnet-c-cidr"
 ## Private Subnet A ##
-  chibiPrivateSubnetA:
-    Value: !Ref chibiPrivateSubnetA
+  PrivateSubnetA:
+    Value: !Ref PrivateSubnetA
     Export:
       Name: !Sub "${PJPrefix}-private-subnet-a"
-  
-  PrivateSubnetACIDR:
-    Value: !Ref PrivateSubnetACIDR
-    Export:
-      Name: !Sub "${PJPrefix}-private-subnet-a-cidr"
 ## Private Subnet C ##
-  chibiPrivateSubnetC:
-    Value: !Ref chibiPrivateSubnetC
+  PrivateSubnetC:
+    Value: !Ref PrivateSubnetC
     Export:
       Name: !Sub "${PJPrefix}-private-subnet-c"
-
-  PrivateSubnetCCIDR:
-    Value: !Ref PrivateSubnetCCIDR
-    Export:
-      Name: !Sub "${PJPrefix}-private-subnet-c-cidr"
-      
-### RouteTable ###
-  chibiPublicARTB:
-    Value: !Ref chibiPublicARTB
-    Export:
-      Name: !Sub "${PJPrefix}-public-route-a"
-  
-  chibiPublicCRTB:
-    Value: !Ref chibiPublicCRTB
-    Export:
-      Name: !Sub "${PJPrefix}-public-route-c"
-
-  chibiPrivateARTB:
-    Value: !Ref chibiPrivateARTB
-    Export:
-      Name: !Sub "${PJPrefix}-private-route-a"
-  
-  chibiPrivateCRTB:
-    Value: !Ref chibiPrivateCRTB
-    Export:
-      Name: !Sub "${PJPrefix}-private-route-c"
-

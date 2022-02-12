@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: chibiharu's Qiita [【AWS】CloudFormationでWebサーバを構築①（NW編）] - SecurityTemplate
+Description: Web2tier-Security-Template
 
 
 # ------------------------------------------------------------
@@ -17,10 +17,10 @@ Resources:
 # SecurityGroup
 # ------------------------------------------------------------
 ### ALB Server Security Group ###
-    chibiALBSG:
+    ALBSG:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
-            GroupDescription: "http,https public"
+            GroupDescription: "https"
             GroupName: cfn-dev-alb-sg
             VpcId: { "Fn::ImportValue": !Sub "${PJPrefix}-vpc" }
             Tags: 
@@ -28,19 +28,15 @@ Resources:
                   Value: !Sub "${PJPrefix}-alb-sg"
             SecurityGroupIngress:
                 IpProtocol: tcp
-                FromPort : 80
-                ToPort : 80
-                CidrIp: 0.0.0.0/0
-                IpProtocol: tcp
                 FromPort : 443
                 ToPort : 443
                 CidrIp: 0.0.0.0/0
                 
 ### Web Server Security Group ###
-    chibiWebSG:
+    WebSG:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
-            GroupDescription: "http public"
+            GroupDescription: "http"
             GroupName: cfn-dev-web-sg
             VpcId: { "Fn::ImportValue": !Sub "${PJPrefix}-vpc" }
             Tags: 
@@ -50,39 +46,39 @@ Resources:
                 IpProtocol: tcp
                 FromPort : 80
                 ToPort : 80
-                SourceSecurityGroupId: !Ref chibiALBSG
-
-### Database Server Security Group ###            
-    chibidbSG:
+                SourceSecurityGroupId: !Ref ALBSG
+                
+### RDS Security Group ###            
+    RDSSG:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
-            GroupDescription: "db private"
-            GroupName: cfn-dev-db-sg
+            GroupDescription: "mysql"
+            GroupName: cfn-dev-rds-sg
             VpcId: { "Fn::ImportValue": !Sub "${PJPrefix}-vpc" }
             Tags: 
                 - Key: Name
-                  Value: !Sub "${PJPrefix}-db-sg"
+                  Value: !Sub "${PJPrefix}-RDS-sg"
             SecurityGroupIngress:
                 IpProtocol: tcp
                 FromPort : 3306
                 ToPort : 3306
-                SourceSecurityGroupId: !Ref chibiWebSG
-        
-
+                SourceSecurityGroupId: !Ref WebSG
+                
+                
 # ------------------------------------------------------------
 # Output Parameter
 # ------------------------------------------------------------
 Outputs:
 ### SecurityGroup ###
-    chibiALBSG:
-        Value: !Ref chibiALBSG
+    ALBSG:
+        Value: !Ref ALBSG
         Export:
             Name: !Sub "${PJPrefix}-alb-sg"
-    chibiWebSG:
-        Value: !Ref chibiWebSG
+    WebSG:
+        Value: !Ref WebSG
         Export:
             Name: !Sub "${PJPrefix}-web-sg"
-    chibidbSG:
-        Value: !Ref chibidbSG
+    RDSSG:
+        Value: !Ref RDSSG
         Export:
-            Name: !Sub "${PJPrefix}-db-sg"
+            Name: !Sub "${PJPrefix}-rds-sg"
